@@ -1,0 +1,165 @@
+services:
+  oobeya-nginx:
+    image: "oobeya.azurecr.io/oobeya-nginx:latest"
+    restart: "always"
+    ports:
+      - "80:80"
+    container_name: "oobeya-nginx"
+  oobeya-rabbitmq:
+    image: "oobeya.azurecr.io/oobeya-rabbitmq:latest"
+    container_name: "oobeya-rabbitmq"
+    restart: "always"
+    ports:
+      - 5672:5672
+      - 15672:15672
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_port_connectivity" ]
+      interval: 3s
+      timeout: 3s
+      retries: 300
+    env_file:
+      - env.list
+  oobeya-mongo:
+    image: "oobeya.azurecr.io/oobeya-mongo:latest"
+    restart: "always"
+    ports:
+      - "27017:27017"
+    container_name: "oobeya-mongo"
+    volumes:
+      - /docker/volume/qa-dashboard/mongo:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 3s
+      timeout: 3s
+      retries: 300
+  oobeya-eureka-server:
+    image: "oobeya.azurecr.io/oobeya-eureka-server:latest"
+    restart: "always"
+    ports:
+      - "8761:8761"
+      - "58761:58761"
+    env_file:
+      - env.list
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:58761/actuator/health" ]
+      interval: 3s
+      timeout: 3s
+      retries: 300
+    container_name: "oobeya-eureka-server"
+    depends_on:
+      oobeya-rabbitmq:
+        condition: service_healthy
+  oobeya-platform:
+    image: "oobeya.azurecr.io/oobeya-dashboard:latest"
+    restart: "always"
+    ports:
+      - "8080:8080"
+      - "58080:58080"
+    env_file:
+      - env.list
+    container_name: "oobeya-dashboard"
+    depends_on:
+      oobeya-mongo:
+        condition: service_healthy
+      oobeya-eureka-server:
+        condition: service_healthy
+  oobeya-uaa:
+    image: "oobeya.azurecr.io/oobeya-uaa:latest"
+    restart: "always"
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+    env_file:
+      - env.list
+    container_name: "oobeya-uaa"
+    volumes:
+      - /docker/volume/qa-dashboard/certs:/srv/certs
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-addons:
+    image: "oobeya.azurecr.io/oobeya-addons:latest"
+    restart: "always"
+    ports:
+      - "8079:8079"
+      - "58079:58079"
+    env_file:
+      - env.list
+    container_name: "oobeya-addons"
+    volumes:
+      - /docker/volume/qa-dashboard/certs:/srv/certs
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-devteam:
+    image: "oobeya.azurecr.io/oobeya-devteam:latest"
+    restart: "always"
+    ports:
+      - "8078:8078"
+      - "58078:58078"
+    env_file:
+      - env.list
+    container_name: "oobeya-devteam"
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-gitwiser:
+    image: "oobeya.azurecr.io/oobeya-gitwiser:latest"
+    restart: "always"
+    ports:
+      - "8077:8077"
+      - "58077:58077"
+    env_file:
+      - env.list
+    container_name: "oobeya-gitwiser"
+    volumes:
+      - /docker/volume/qa-dashboard/gitwiser:/tmp/gitwiser
+      - /docker/volume/qa-dashboard/certs:/srv/certs
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-base:
+    restart: "always"
+    image: "oobeya.azurecr.io/oobeya-base:latest"
+    container_name: "oobeya-base"
+    ports:
+      - "8075:8075"
+      - "58075:58075"
+    env_file:
+      - env.list
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-notifier:
+    image: "oobeya.azurecr.io/oobeya-notifier:latest"
+    container_name: "oobeya-notifier"
+    restart: "always"
+    ports:
+      - "8076:8076"
+      - "58076:58076"
+    env_file:
+      - env.list
+    depends_on:
+      oobeya-mongo:
+        condition: service_healthy
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-agilespace:
+    image: "oobeya.azurecr.io/oobeya-agilespace:latest"
+    restart: "always"
+    ports:
+      - "8074:8074"
+      - "58074:58074"
+    env_file:
+      - env.list
+    container_name: "oobeya-agilespace"
+    depends_on:
+      oobeya-platform:
+        condition: service_healthy
+  oobeya-ui:
+    image: "oobeya.azurecr.io/oobeya-ui:latest"
+    restart: "always"
+    ports:
+      - "4200:80"
+    container_name: "oobeya-ui"
+version: "2.1"
